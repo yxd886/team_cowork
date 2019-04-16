@@ -5,6 +5,7 @@ import copy
 
 trade_time=0
 pending_orders=list()
+future_list=list()
 
 
 def check_and_aggregate_orders(api, market):
@@ -29,7 +30,7 @@ def check_and_aggregate_orders(api, market):
             for id in local1_pend_order:
                 time.sleep(1)
                 item = api.get_order_info(market,id)
-                if item['state']=="filled" or "canceled" in item["state"]:
+                if str(item['status'])=="1" or str(item["status"])=="2":
                     need_remove_list.append(id)
                     continue
                 else:
@@ -43,10 +44,9 @@ def check_and_aggregate_orders(api, market):
 
             print("local_pending_order length:%d" % len(local_pending_order))
             for item in local_pending_order:
-                print("side:%s"%item["side"])
-                if item["side"]=="buy":
+                if str(item["type"])=="1":
                     buy_orders.append(item)
-                elif item["side"] =="sell":
+                elif str(item["type"]) =="0":
                     sell_orders.append(item)
 
 
@@ -55,7 +55,7 @@ def check_and_aggregate_orders(api, market):
 
             if len(buy_orders) > 1:
                 for i, item in enumerate(buy_orders):
-                    amount = float(item["amount"]) - float(item["filled_amount"])
+                    amount = float(item["total_amount"]) - float(item["trade_amount"])
                     price = float(item["price"])
                     buy_money += amount * price
                     buy_amount += amount
@@ -71,7 +71,7 @@ def check_and_aggregate_orders(api, market):
 
             if len(sell_orders) > 1:
                 for i, item in enumerate(sell_orders):
-                    amount = float(item["amount"]) - float(item["filled_amount"])
+                    amount = float(item["total_amount"]) - float(item["trade_amount"])
                     price = float(item["price"])
                     sell_money += amount * price
                     sell_amount += amount
@@ -97,6 +97,76 @@ def record(api,market,sell_id,buy_id):
     mutex2.release()
     sell_complete=False
     buy_comlete=False
+    while True:
+        try:
+            time.sleep(5)
+            jump = True
+            if sell_complete or api.is_order_complete(market, sell_id):
+                if not sell_complete:
+                    sell_complete=True
+                    mutex2.acquire()
+                    if sell_id in pending_orders:
+                        pending_orders.remove(sell_id)
+                    mutex2.release()
+            else:
+                jump=False
+            if buy_comlete or api.is_order_complete(market, buy_id):
+                if not buy_comlete:
+                    buy_comlete=True
+                    mutex2.acquire()
+                    if buy_id in pending_orders:
+                        pending_orders.remove(buy_id)
+                    mutex2.release()
+            else:
+                jump=False
+            if jump:
+                mutex1.acquire()
+                trade_time += 2
+                mutex1.release()
+                break
+        except Exception as ex:
+            print(sys.stderr, 'record ex: ', ex)
+            continue
+
+def future_process(api):
+    global future_list,mutex3,pending_orders,mutex2
+    while True:
+        try:
+            time.sleep(5)
+            item=None
+            mutex3.acquire()
+            length = len(future_list)
+            if length:
+                item = future_list[0]
+            mutex3.release()
+            if(length==0):
+                continue
+            money, coin, freez_money, freez_coin = api.get_available_balance(_money, _coin)
+            market = item[0]
+            direction=item[1]
+            price = item[2]
+            size = item[3]
+            id="-1"
+            if direction=="buy":
+                if money>size*price:
+                    id = api.take_order(market,direction,price,size)
+            else:
+                if coin>size:
+                    id = api.take_order(market, direction, price, size)
+            if id!="-1":
+                mutex3.acquire()
+                future_list.remove(item)
+                mutex3.release()
+                mutex2.acquire()
+                pending_orders.append(id)
+                mutex2.release()
+
+
+
+        except Exception as ex:
+            print(sys.stderr, 'future_process exception: ', ex)
+            continue
+
 
 
 
@@ -105,99 +175,109 @@ if __name__ == '__main__':
     access_secret = 'de38de17-aabb-4d33-a687-5677d0de0a53'
     market = "USDT_QC"
     api = zb_api(access_key, access_secret)
-    size = 20
-    # api.wait_pending_order(market)
-    buy, ask = api.get_buy1_and_sell_one(market)
-    money, coin, freez_money, freez_coin = api.get_available_balance("QC","USDT")
-    profit = 0
-    money_today = money + freez_money
-    coin_today = coin + freez_coin
-
-    lowest = 6.66
-    higest = 7.05
-
-    money_have = money + freez_money + (coin + freez_coin) * buy
-
-    # api.balance_account("QC","USDT")
-
-
+    _coin = "USDT"
+    _money = "QC"
+    market = _coin +"_"+ _money
+    mutex1 = threading.Lock()
+    mutex2 = threading.Lock()
+    mutex3 = threading.Lock()
+    process_time = 0
+    # api.send_heart_beat()
+    thread1 = threading.Thread(target=check_and_aggregate_orders, args=(api, market,))
+    thread1.start()
+    thread2 = threading.Thread(target=future_process, args=(api,))
+    thread2.start()
 
     while True:
         try:
-            time.sleep(1)
-            api.handle_order_in_queue(market)
+            time.sleep(2)
+            sell_id="-1"
+            buy_id="-1"
+            money, coin, freez_money, freez_coin = api.get_available_balance(_money, _coin)
+            size = 5
             buy, ask = api.get_buy1_and_sell_one(market)
-            money, coin, freez_money, freez_coin = api.get_available_balance("QC", "USDT")
-            ratio = (money + freez_money) / (money + freez_money + (coin + freez_coin) * buy)
-            if ratio<0.25:
-                api.check_and_aggregate_orders(market)
-            profit = money + freez_money + (coin + freez_coin) * buy - money_have
-            print("!!!PROFIT:%f" % profit)
-            print("!!!PROFIT: coin:%f,money:%f" % (coin + freez_coin - coin_today, money + freez_money - money_today))
+            if money<buy*size and coin<size:
+                print("-----------------------------------------------------------------")
+                print("process_time:%d" % process_time)
+                mutex1.acquire()
+                print("trade_time:%d" % trade_time)
+                mutex1.release()
+                print("sell price:%f" % ask)
+                print(" buy price:%f" % buy)
+                print("no money and coin!")
+                continue
+            elif money>=buy*size and coin>=size:
+                sell_id = api.take_order(market, "sell", ask, size)
+                buy_id = api.take_order(market, "buy", buy, size)
+                process_time += 2
+                print("-----------------------------------------------------------------")
+                print("process_time:%d" % process_time)
+                mutex1.acquire()
+                print("trade_time:%d" % trade_time)
+                mutex1.release()
+                print("sell price:%f" % ask)
+                print(" buy price:%f" % buy)
 
-            upper = ask
-            lower = buy
-            sell_id = "-1"
-            buy_id = "-1"
-
-            if upper > lowest and lower < higest:
-                if (money >= lower * size and coin >= size):
-                    print("take pair order")
-                    sell_id = api.take_order(market, "sell", upper, size=size)
-                    buy_id = api.take_order(market, "buy", lower, size=size)
-                elif (money >= lower * size and coin < size):  # can buy but not sell
-                    print("take buy order and enqueue sell order")
-                    # sell_id = api.take_order(market, "sell", upper, size=size)
-                    buy_id = api.take_order(market, "buy", lower, size=size)
-                    api.enqueue_sell_order(price=upper, size=size)
-                elif (money < lower * size and coin >= size):  # can sell but not buy
-                    print("take sell order and enqueue buy order")
-                    sell_id = api.take_order(market, "sell", upper, size=size)
-                    api.enqueue_buy_order(price=lower, size=size)
-            elif upper <= lowest:
-                buy_id = api.take_order(market, "buy", upper, size=size)
-                time.sleep(1)
-                continue
-            elif lower >= higest:
-                sell_id = api.take_order(market, "sell", lower, size=size)
-                time.sleep(1)
-                continue
-            else:
-                time.sleep(4)
-                continue
+                thread = threading.Thread(target=record, args=(api, market, sell_id, buy_id,))
+                thread.start()
+            elif money<buy*size and coin>=size:# can sell but not buy
+                sell_id = api.take_order(market, "sell", ask, size)
+                process_time += 2
+                print("-----------------------------------------------------------------")
+                print("process_time:%d" % process_time)
+                mutex1.acquire()
+                trade_time += 2
+                print("trade_time:%d" % trade_time)
+                mutex1.release()
+                print("sell price:%f" % ask)
+                print(" buy price:%f" % buy)
+                print("only sell")
+                mutex3.acquire()
+                future_list.append((market, "buy", buy, size))
+                mutex3.release()
+            elif money>=buy*size and coin<size: #can buy but not sell
+                buy = api.take_order(market, "buy", buy, size)
+                process_time += 2
+                print("-----------------------------------------------------------------")
+                print("process_time:%d" % process_time)
+                mutex1.acquire()
+                trade_time += 2
+                print("trade_time:%d" % trade_time)
+                mutex1.release()
+                print("sell price:%f" % ask)
+                print(" buy price:%f" % buy)
+                print("only buy")
+                mutex3.acquire()
+                future_list.append((market, "sell", ask, size))
+                mutex3.release()
 
         except Exception as ex:
             print(sys.stderr, 'zb request ex: ', ex)
-            time.sleep(10)
+            time.sleep(5)
             continue
-        counter = 0
+
         while True:
             try:
-                counter += 1
-                time.sleep(4.001)
-                print("in waiting order complete")
-                print("!!!PROFIT:%f,price for this step:%f" % (profit, buy))
-                print(
-                    "!!!PROFIT: coin:%f,money:%f" % (coin + freez_coin - coin_today, money + freez_money - money_today))
+                buy, ask = api.get_buy1_and_sell_one(market)
+                print("current_sell:%f" % ask)
+                print("current_buy :%f" % buy)
+                mutex1.acquire()
+                print("trade_time:%d" % trade_time)
+                mutex1.release()
                 if sell_id == "-1" and buy_id == "-1":
                     break
-                if sell_id != "-1":
-                    if api.is_order_complete(market, sell_id):
-                        break
-                    elif counter > 10 and buy_id == "-1":
-                        api.cancel_order(market, sell_id)
-                        api.dequeue_current_buy_order()
-                        break
-                    time.sleep(1)
-                if buy_id != "-1":
-                    if api.is_order_complete(market, buy_id):
-                        break
-                    elif counter > 10 and sell_id == "-1":
-                        api.cancel_order(market, buy_id)
-                        api.dequeue_current_sell_order()
-                        break
+                if sell_id != "-1" and api.is_order_complete(market, sell_id):  # order success
+                    print("sell order complete")
+                    break
+                if buy_id != "-1" and api.is_order_complete(market, buy_id):  # order success
+                    print("buy order complete")
+                    break
+                print("order not complete")
+                time.sleep(5)
+
             except Exception as ex:
-                print(sys.stderr, 'zb request ex: ', ex)
+                print(sys.stderr, 'second_exception: ', ex)
                 time.sleep(5)
                 continue
+
 

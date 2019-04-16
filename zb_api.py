@@ -126,7 +126,7 @@ class zb_api:
 
     def is_order_complete(self, market, id):
         obj = self.get_order_info(market, id)
-        if obj["status"] == 2:
+        if obj["status"] == 2 or obj["status"]==1:
             return True
         else:
             return False
