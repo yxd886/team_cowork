@@ -8,12 +8,16 @@ if __name__ == '__main__':
     _money = "QC"
     market = _coin+"_"+_money
     api = zb_api(access_key, access_secret)
+    time.sleep(0.5)
+    Total_balance = api.get_total_balance()
+    time.sleep(0.5)
+    buy, ask = api.get_buy1_and_sell_one(market)
 
     upper_price = 7.04
     middle_price = 6.95
     lower_price = 6.7
-    total_coin = 830
-    cell_num = 600
+    total_coin = Total_balance//buy
+    cell_num = 50
     step = round((upper_price - lower_price) / cell_num,4)
 
 
@@ -51,7 +55,7 @@ if __name__ == '__main__':
 
 
     buy_price = buy-step
-    sell_price = ask+step
+    sell_price = ask+step*1.3
     trade_time=0
 
     while True:
@@ -142,14 +146,14 @@ if __name__ == '__main__':
                     print("sell order complete")
                     api.cancel_order(market,buy_order_id)
                     buy_price=sell_trade_price-step
-                    sell_price=sell_trade_price+step
+                    sell_price=sell_trade_price+step*1.3
                     break
                 if buy_order_id!="-1" and api.is_order_complete(market, buy_order_id):# order success
                     trade_time+=1
                     print("buy order complete")
                     api.cancel_order(market,sell_order_id)
                     buy_price=buy_trade_price-step
-                    sell_price=buy_trade_price+step
+                    sell_price=buy_trade_price+step*1.3
                     break
 
                 print("order not complete")

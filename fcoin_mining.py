@@ -8,6 +8,7 @@ pending_orders=list()
 
 def check_and_aggregate_orders(api, market):
     global  pending_orders, mutex2
+    counter=0
     while True:
         try:
             print("in aggregate")
@@ -83,6 +84,7 @@ def check_and_aggregate_orders(api, market):
                 pending_orders.append(id)
                 mutex2.release()
             time.sleep(20)
+            counter+=20
         except Exception as ex:
             print(sys.stderr, 'in check and aggrete: ', ex)
             continue

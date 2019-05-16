@@ -12,6 +12,7 @@ def check_and_aggregate_orders(api, market):
     global  pending_orders, mutex2
     while True:
         try:
+            time.sleep(1)
             print("in aggregate")
             buy_orders = list()
             buy_money = 0
@@ -28,9 +29,9 @@ def check_and_aggregate_orders(api, market):
             mutex2.release()
 
             for id in local1_pend_order:
-                time.sleep(1)
+                time.sleep(2)
                 item = api.get_order_info(market,id)
-                if str(item['status'])=="1" or str(item["status"])=="2":
+                if  "message" in item.keys() or str(item['status'])=="1" or str(item["status"])=="2":
                     need_remove_list.append(id)
                     continue
                 else:
@@ -55,6 +56,7 @@ def check_and_aggregate_orders(api, market):
 
             if len(buy_orders) > 1:
                 for i, item in enumerate(buy_orders):
+                    time.sleep(1)
                     amount = float(item["total_amount"]) - float(item["trade_amount"])
                     price = float(item["price"])
                     buy_money += amount * price
@@ -71,6 +73,7 @@ def check_and_aggregate_orders(api, market):
 
             if len(sell_orders) > 1:
                 for i, item in enumerate(sell_orders):
+                    time.sleep(1)
                     amount = float(item["total_amount"]) - float(item["trade_amount"])
                     price = float(item["price"])
                     sell_money += amount * price
@@ -110,6 +113,7 @@ def record(api,market,sell_id,buy_id):
                     mutex2.release()
             else:
                 jump=False
+            time.sleep(1)
             if buy_comlete or api.is_order_complete(market, buy_id):
                 if not buy_comlete:
                     buy_comlete=True
@@ -173,8 +177,22 @@ def future_process(api):
 if __name__ == '__main__':
     access_key = 'c9a579cf-5e0a-4f01-abd2-386cc127a4ad'
     access_secret = 'de38de17-aabb-4d33-a687-5677d0de0a53'
+
+    access_key1 = "ba635b76-22f1-440e-a61d-1b447590d5e2"
+    access_secret1 = "88ed80ea-6ca6-4c28-a3f5-97fb8e630b0e"
+
+
+    access_key2="25c459f8-07a5-475c-949a-440958ec3722"
+    access_secret2="1dec655b-aea0-40c9-aff7-f6a86316bbf9"
+
+    access_key3="0df41cfc-953a-44f8-995a-0260fabaee8f"
+    access_secret3="0165c1e0-6352-435c-b04a-d38625bf5cc0"
+
     market = "USDT_QC"
     api = zb_api(access_key, access_secret)
+    api1=zb_api(access_key1,access_secret1) #for pending
+    api2 = zb_api(access_key2,access_secret2) #for record
+    api3 = zb_api(access_key3,access_secret3) #for future process
     _coin = "USDT"
     _money = "QC"
     market = _coin +"_"+ _money
@@ -183,9 +201,9 @@ if __name__ == '__main__':
     mutex3 = threading.Lock()
     process_time = 0
     # api.send_heart_beat()
-    thread1 = threading.Thread(target=check_and_aggregate_orders, args=(api, market,))
+    thread1 = threading.Thread(target=check_and_aggregate_orders, args=(api1, market,))
     thread1.start()
-    thread2 = threading.Thread(target=future_process, args=(api,))
+    thread2 = threading.Thread(target=future_process, args=(api3,))
     thread2.start()
 
     while True:
@@ -218,7 +236,7 @@ if __name__ == '__main__':
                 print("sell price:%f" % ask)
                 print(" buy price:%f" % buy)
 
-                thread = threading.Thread(target=record, args=(api, market, sell_id, buy_id,))
+                thread = threading.Thread(target=record, args=(api2, market, sell_id, buy_id,))
                 thread.start()
             elif money<buy*size and coin>=size:# can sell but not buy
                 sell_id = api.take_order(market, "sell", ask, size)
@@ -261,6 +279,7 @@ if __name__ == '__main__':
                 buy, ask = api.get_buy1_and_sell_one(market)
                 print("current_sell:%f" % ask)
                 print("current_buy :%f" % buy)
+                print("process_time:%d" % process_time)
                 mutex1.acquire()
                 print("trade_time:%d" % trade_time)
                 mutex1.release()

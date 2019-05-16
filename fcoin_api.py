@@ -1,11 +1,6 @@
 __author__ = 'Ziyang'
 
-import json, hashlib, struct, time, sys
-import urllib.request
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-from datetime import datetime
+import  struct
 SERVER = 'api.fcoin.com'
 PORT = 80
 HT= 'https://%s/v2/'
@@ -33,6 +28,7 @@ import pandas as pd
 import requests
 import time
 import base64
+import sys
 
 
 class DataAPI():
@@ -75,6 +71,8 @@ class DataAPI():
 
         }
         #print(url)
+        url= url.replace("fcoin","ifukang",1)
+        #print(url)
 
         try:
             r = requests.request(method, url, headers=headers, json=params)
@@ -86,6 +84,8 @@ class DataAPI():
             return r.json()
 
     def public_request(self, method, url, **params):
+        url=url.replace("fcoin", "ifukang", 1)
+        #print(url)
         try:
             r = requests.request(method, url, params=params)
             r.raise_for_status()
@@ -108,9 +108,10 @@ class DataAPI():
         return self.public_request(GET, self.http_public + CURRENCY)['data']
 
     def symbols(self):
-        js = self.public_request(GET, self.http_public + SYMBOLS)['data']
+        js = self.public_request(GET, "https://www.ifukang.com/openapi/v2/symbols")['data']["symbols"]
+        #print(js)
         df = pd.DataFrame(js)
-        return df
+        return js
 
     def get_ticker(self, symbol):
         return self.public_request(GET, self.http_market + TICKER % symbol)
@@ -135,13 +136,13 @@ class DataAPI():
         """create order"""
         return self.signed_request(POST, self.http_orders, **payload)
 
-    def buy(self, symbol, price, amount):
+    def buy(self, symbol, price, amount,exchange="main"):
         """buy someting"""
-        return self.create_order(symbol=symbol, side='buy', type='limit', price=str(price), amount=amount)
+        return self.create_order(symbol=symbol, side='buy', type='limit', price=str(price), amount=amount,exchange=exchange)
 
-    def sell(self, symbol, price, amount):
+    def sell(self, symbol, price, amount,exchange="main"):
         """sell someting"""
-        return self.create_order(symbol=symbol, side='sell', type='limit', price=str(price), amount=amount)
+        return self.create_order(symbol=symbol, side='sell', type='limit', price=str(price), amount=amount,exchange=exchange)
 
     def get_order(self, order_id):
         """get specfic order"""
@@ -149,7 +150,9 @@ class DataAPI():
 
     def cancel_order(self, order_id):
         """cancel specfic order"""
+
         return self.signed_request(POST, self.http_orders + '%s/submit-cancel' % order_id)
+
 
     def order_result(self, order_id):
         """check order result"""
@@ -182,83 +185,21 @@ class fcoin_api:
         self.sell_order = list()
         self.current_buy_order = None
         self.current_buy_order = None
+        self.amount_decimal = 2
+        self.price_decimal = 2
 
-    def __fill(self, value, lenght, fillByte):
-        if len(value) >= lenght:
-            return value
-        else:
-            fillSize = lenght - len(value)
-        return value + chr(fillByte) * fillSize
 
-    def __doXOr(self, s, value):
-        slist = list(s.decode('utf-8'))
-        for index in range(len(slist)):
-            slist[index] = chr(ord(slist[index]) ^ value)
-        return "".join(slist)
+    def set_demical(self,money,coin):
+        obj = self._api.symbols()
+        print(obj)
+        #obj=obj.loc[(obj['quote_currency'] == money)&(obj['base_currency'] == coin), ['amount_decimal', 'price_decimal',"limit_amount_min"]]
+        obj = obj[coin+money]
+        #print(obj)
+        self.amount_decimal = obj["amount_decimal"]
+        self.price_decimal = obj["price_decimal"]
+        self.limit_amount_min = float(obj["limit_amount_min"])
 
-    def __hmacSign(self, aValue, aKey):
-        keyb = struct.pack("%ds" % len(aKey), aKey.encode('utf-8'))
-        value = struct.pack("%ds" % len(aValue), aValue.encode('utf-8'))
-        k_ipad = self.__doXOr(keyb, 0x36)
-        k_opad = self.__doXOr(keyb, 0x5c)
-        k_ipad = self.__fill(k_ipad, 64, 54)
-        k_opad = self.__fill(k_opad, 64, 92)
-        m = hashlib.md5()
-        m.update(k_ipad.encode('utf-8'))
-        m.update(value)
-        dg = m.digest()
-
-        m = hashlib.md5()
-        m.update(k_opad.encode('utf-8'))
-        subStr = dg[0:16]
-        m.update(subStr)
-        dg = m.hexdigest()
-        return dg
-
-    def __digest(self, aValue):
-        value = struct.pack("%ds" % len(aValue), aValue.encode('utf-8'))
-        # print(value)
-        h = hashlib.sha1()
-        h.update(value)
-        dg = h.hexdigest()
-        return dg
-
-    def __trade_api_call(self, path, params=''):
-        try:
-            SHA_secret = self.__digest(self.mysecret)
-            sign = self.__hmacSign(params, SHA_secret)
-            self.jm = sign
-            reqTime = (int)(time.time() * 1000)
-            params += '&sign=%s&reqTime=%d' % (sign, reqTime)
-            url = 'https://trade.zb.com/api/' + path + '?' + params
-            # print(url)
-            req = urllib.request.Request(url)
-            res = urllib.request.urlopen(req, timeout=2)
-            doc = json.loads(res.read().decode('utf-8'))
-            return doc
-        except Exception as ex:
-            print(sys.stderr, 'zb request ex: ', ex)
-            return None
-
-    def __data_api_call(self, path, params=''):
-
-        reqTime = (int)(time.time() * 1000)
-        url = 'http://api.zb.cn/data/v1/' + path + '?' + params
-        req = urllib.request.Request(url)
-        res = urllib.request.urlopen(req, timeout=2)
-        txt = res.read().decode('utf-8')
-        # print(txt)
-        doc = json.loads(txt)
-        return doc
-
-    def query_account(self):
-
-        params = "accesskey=" + self.mykey + "&method=getAccountInfo"
-        path = 'getAccountInfo'
-
-        obj = self.__trade_api_call(path, params)
-        # print obj
-        return obj
+        return self.limit_amount_min
 
     def get_depth(self, market):
         # try:
@@ -268,22 +209,28 @@ class fcoin_api:
         #      print(sys.stderr, 'zb query_account exception,', ex)
         #      return None
 
-    def take_order(self, market, direction, price, size):
+    def get_two_float(self, f_str, n):
+        f_str = str(f_str)  # f_str = '{}'.format(f_str) 也可以转换为字符串
+        a, b, c = f_str.partition('.')
+        c = (c + "0" * n)[:n]  # 如论传入的函数有几位小数，在字符串后面都添加n为小数0
+        return ".".join([a, c])
+
+    def take_order(self, market, direction, price, size,place="main"):
         while True:
-            size = round(size,4)
-            price=round(price,4)
+            size = self.get_two_float(size,self.amount_decimal)
+            price=self.get_two_float(price,self.price_decimal)
             print(size)
             print(price)
             if direction == "buy":
-                obj = self._api.buy(symbol=market, price=price, amount=size)
+                obj = self._api.buy(symbol=market, price=price, amount=size,exchange=place)
             else:
-                obj = self._api.sell(symbol=market, price=price, amount=size)
+                obj = self._api.sell(symbol=market, price=price, amount=size,exchange=place)
             #print(obj)
             if obj:
                 break
             else:
                 time.sleep(1)
-                continue
+                return "-1"
 
         id = obj.get("data", "-1")
         return id
@@ -320,12 +267,15 @@ class fcoin_api:
         sell1 = obj["asks"][0]
         return buy1, sell1
 
-    def get_pending_orders(self, market):
-        params = "accesskey=" + self.mykey + "&currency=" + market + "&method=getUnfinishedOrdersIgnoreTradeType&pageIndex=1&pageSize=10"
-        path = 'getUnfinishedOrdersIgnoreTradeType'
-        obj = self.__trade_api_call(path, params)
-        # print(obj)
-        return obj
+    def cancel_all_pending_order(self,market):
+        obj = self._api.list_orders(symbol=market,states="submitted,partial_filled")
+        print(obj)
+        obj = obj["data"]
+        id_list = [item["id"] for item in obj]
+        for id in id_list:
+            time.sleep(0.5)
+            self.cancel_order(market,id)
+
 
     def cancel_order(self, market, id):
         if id=="-1":
@@ -508,6 +458,20 @@ class fcoin_api:
         # print("current_price:%f" % current_price)
         # print("index:%d" % index)
         # print("coin_should_have:%f" % self.cell_money[index])
-        return self.cell_step[index]
+        return 5*(self.cell_step[index])
 
+
+access_key = '3d606364177e4edcabd29019229317b4'
+access_secret = 'c84923d2aa8d47dab75e6655c3ac78c0'
+partition = 2
+money_have = 900
+_money = "pax"
+_coin = "btc"
+
+bidirection = True
+coin_place = "main"
+
+total_filled_amount = 0
+api = fcoin_api(access_key, access_secret)
+api.set_demical(_money,_coin)
 

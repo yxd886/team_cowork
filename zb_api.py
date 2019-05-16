@@ -76,6 +76,7 @@ class zb_api:
 
         reqTime = (int)(time.time() * 1000)
         url = 'http://api.zb.cn/data/v1/' + path + '?' + params
+        print(url)
         req = urllib.request.Request(url)
         res = urllib.request.urlopen(req, timeout=2)
         txt = res.read().decode('utf-8')
@@ -126,10 +127,23 @@ class zb_api:
 
     def is_order_complete(self, market, id):
         obj = self.get_order_info(market, id)
+        if "message" in obj.keys():
+            return True
         if obj["status"] == 2 or obj["status"]==1:
             return True
         else:
             return False
+
+    def get_kline(self,market,type,since=None,size="1000"):
+        if since==None:
+            params = "market=" + market + "&type=" + type + "&size=" + size
+        else:
+            params = "market=" + market + "&type="+type+"&since="+since+"&size="+size
+        path = 'kline'
+        obj = self.__data_api_call(path, params)
+        return obj
+
+
 
     def get_available_balance(self, money, coin):
         obj = self.query_account()
@@ -177,6 +191,21 @@ class zb_api:
         buy1 = obj["bids"][0][0]
         sell1 = obj["asks"][-1][0]
         return buy1, sell1
+
+
+    def get_buy1_and_sell_one_and_depth(self, market):
+       # print(market)
+        obj = self.get_depth(market)
+        #print(obj)
+        if obj.get("error",None)=="市场错误":
+            return 0,0
+        buy1 = obj["bids"][0][0]
+        sell1 = obj["asks"][-1][0]
+        depth_buy1 = obj["bids"][0][1]
+
+        depth_sell1 = obj["asks"][-1][1]
+        return buy1, sell1,depth_buy1,depth_sell1
+
 
     def get_pending_orders1(self, market):
         params = "accesskey=" + self.mykey + "&currency=" + market + "&method=getUnfinishedOrdersIgnoreTradeType&pageIndex=1&pageSize=10"
