@@ -11,7 +11,8 @@ from multiprocessing import Process
 import multiprocessing
 from PIL import Image,ImageTk
 import random
-
+#import qrcode
+import pyqrcode
 '''
 采用AES对称加密算法
 '''
@@ -91,9 +92,6 @@ def get_mac_address():
     return mac
 
 def check_and_save(signature):
-    #signature = entry1.get().strip().encode()
-    #print("Signature")
-    #print(signature)
     new_msg = msg1+gap+"lyaegjdfuyeu"
     try:
         rsa.verify(new_msg.encode(), b64decode(signature), public)
@@ -103,10 +101,7 @@ def check_and_save(signature):
         sys.exit()
     with open(yanzheng_file_name, 'w') as f:
         f.write(encrypt_oracle(msg1+":::::"+signature.decode()))
-        #f.write("\n")
-        #f.write(encrypt_oracle(signature.decode()))
-        #f.write(msg1+"\n")
-        #f.write(signature.decode())
+
     win.destroy()
 
 
@@ -422,22 +417,118 @@ def tick(load_access_key, load_access_secret, load_money, load_coin, load_pariti
         #a= input()
 
 
-def save_record():
-    global global_config,load_access_key,load_access_secret,load_money,load_coin,load_parition,load_total_money,load_bidirection,load_coin_place
+def cancel_exit():
+    global global_process,load_access_key, load_access_secret,load_money, load_coin, heart_T,win
+    access_key = load_access_key.strip()
+    access_secret = load_access_secret.strip()
+    _money =load_money.strip().lower()
+    tmp =load_coin.strip().lower()
+    if " "in tmp:
+        coins =tmp.split(" ")
+    else:
+        coins = [tmp]
+    markets = [_coin+_money for _coin in coins]
+    print(markets)
+    partition = int(load_parition.strip())
+    assert(partition!=0)
+    api = fcoin_api(access_key, access_secret)
+    global_process.terminate()
+    heart_T.insert(tkinter.END, "正在撤单,请稍后\n")
+    win.update()
+    for market in markets:
+        time.sleep(0.1)
+        api.cancel_all_pending_order(market)
+    heart_T.insert(tkinter.END, "撤单结束,安全退出\n")
+    win.update()
+    time.sleep(1)
+    sys.exit()
 
-    load_access_key=save_access_key = entry1.get().strip()
-    load_access_secret=save_access_secret = entry2.get().strip()
-    load_money=save__money = entry4.get().strip().lower()
-    load_coin=save__coin = entry5.get().strip().lower()
-    load_parition=save_parition = entry6.get().strip()
-    load_total_money=save_total_money = (entry7.get().strip())
-    load_bidirection=save_bidirection = (entry8.get().strip())
-    load_coin_place=save_coin_place = (entry9.get().strip())
+
+
+heart_T=None
+global_process=None
+heart_counter=None
+
+def real_save_record():
+    global heart_counter,global_process,heart_T,win,global_config, load_access_key, load_access_secret, load_money, load_coin, load_parition, load_total_money, load_bidirection, load_coin_place, label1, label2, label4, label5, label6, label7, label8, label9, button,run_label,hert_label
+
+    load_access_key = save_access_key = entry1.get().strip()
+    load_access_secret = save_access_secret = entry2.get().strip()
+    load_money = save__money = entry4.get().strip().lower()
+    load_coin = save__coin = entry5.get().strip().lower()
+    load_parition = save_parition = entry6.get().strip()
+    load_total_money = save_total_money = (entry7.get().strip())
+    load_bidirection = save_bidirection = (entry8.get().strip())
+    load_coin_place = save_coin_place = (entry9.get().strip())
 
     tmp = save_access_key + gap + save_access_secret + gap + save__money + gap + save__coin + gap + save_parition + gap + save_total_money + gap + save_bidirection + gap + save_coin_place
     global_config = encrypt_oracle(tmp)
 
-    win.destroy()
+    with open(config_file, 'w') as f:
+        f.write(global_config)
+
+    # win.destroy()
+    for item in [label1, label2, label4, label5, label6, label7, label8, label9, entry1, entry2, entry4, entry5, entry6,
+                 entry7, entry8, entry9, button]:
+        item.destroy()
+
+
+    heart_counter = 1
+    run_label = tkinter.Label(win, text="软件运行状态：   运行中")
+    run_label.pack()
+    hert_label = tkinter.Label(win, text="------------------心跳窗口-----------------------")
+    hert_label.pack()
+    hert_label1 = tkinter.Label(win, text="心跳频率为每小时一次，若超过一个小时没有心跳，请退出重新开启该软件")
+    hert_label1.pack()
+    heart_T = tkinter.Text(win, height=30, width=60)
+    heart_T.pack()
+    start_time = time.time()
+    time.sleep(1)
+    current_time = time.time()
+    time_local = time.localtime(current_time)
+    dt = time.strftime("%Y-%m-%d %H:%M:%S", time_local)
+    heart_msg = "时间：" + dt + " 第%d次心跳.\n"%(heart_counter)
+    heart_T.insert(tkinter.END, heart_msg)
+
+    button2 = tkinter.Button(win, text="一键撤单并退出", command=cancel_exit)  # 收到消息执行这个函数
+    button2.pack()
+
+    win.update()
+
+    load_money = "usdt"
+    load_coin = "eth btc etc ltc eos bch trx xrp ft xlm zec ada dash bsv iota"
+    load_coin = "eth btc"
+    load_parition = "2"
+    # load_total_money="100"
+    load_bidirection = "3"
+    load_coin_place = "1"
+    while True:
+        global_process = Process(target=tick, args=(
+            load_access_key, load_access_secret, load_money, load_coin, load_parition, load_total_money,
+            load_bidirection,
+            load_coin_place, created_time, license_day, expired_time))
+        global_process.daemon = True
+        global_process.start()
+        global_process.join(timeout=3600)
+        print("terminate")
+        global_process.terminate()
+        print("main exit")
+        if (heart_counter % 10 == 0):
+            heart_T.delete('1.0', 'end')
+        heart_counter+=1
+        current_time = time.time()
+        time_local = time.localtime(current_time)
+        dt = time.strftime("%Y-%m-%d %H:%M:%S", time_local)
+        heart_msg = "时间：" + dt + " 第%d次心跳.\n" % (heart_counter)
+        heart_T.insert(tkinter.END, heart_msg)
+        win.update()
+
+
+def save_record():
+    thread = threading.Thread(target=real_save_record, args=())
+    thread.setDaemon(True)
+    thread.start()
+
 
 def delete_record():
     if os.path.exists(config_file):
@@ -483,14 +574,26 @@ def check_status():
     tran_id = tran.get().strip()
     URL ="http://api.ethplorer.io/getTxInfo/"+tran_id+"?apiKey=freekey"
     print("tran_id:%s" % tran_id)
-    r = requests.request("GET", URL)
-    r.raise_for_status()
-    obj = r.json()
+    _continue=True
+    obj=dict()
+    try:
+        r = requests.request("GET", URL,timeout=10)
+        r.raise_for_status()
+        obj = r.json()
+    except:
+        pass
     #print(obj)
     print("confirmation number:%s"%(obj.get("confirmations",None)))
     operations = obj.get("operations", None)
     confirmation=obj.get("confirmations",None)
-    if not confirmation or int(confirmation)<1:
+    if "error" in obj.keys():
+        if "format" in obj["error"]["message"]:
+            labelb = tkinter.Label(win, text="操作次数：%d, 交易哈希格式错误,请重新输入再点击确认按钮:" % (counter))
+            labelb.pack()
+        else:
+            labelb = tkinter.Label(win, text="操作次数：%d,网络尚未确认该交易，请稍后重新点击确认按钮:" % (counter))
+            labelb.pack()
+    elif int(confirmation)<1:
         labelb = tkinter.Label(win, text="操作次数：%d,确认数:%d/1, 网络尚未确认该交易，请稍后重新点击确认按钮:"%(counter,int(confirmation)))
         labelb.pack()
     elif operations==None:
@@ -534,6 +637,7 @@ def get_transaction():
     button.destroy()
     button = tkinter.Button(win, text="确定", command=check_status)  # 收到消息执行这个函数
     button.pack()  # 加载到窗体，
+
 
 
 
@@ -697,17 +801,25 @@ Iez4OV5lRRQhNxOFtdK5ff4DM3PfkBTfqrDfMqNiG5dJTRBo
         win.mainloop()
         '''
         recv_address = "0xae926369fd621702caea0d97a61a5d0b11290740"
+
+
+
+
+
+
         win = tkinter.Tk()
         win.title("付款")
-        im = Image.open("address.png").resize((100, 100))
-        img = ImageTk.PhotoImage(im)
-        imLabel = tkinter.Label(win, image=img).pack()
+        code = pyqrcode.create(recv_address)
+        code_xbm = code.xbm(scale=5)
+        code_bmp = tkinter.BitmapImage(data=code_xbm)
+        code_bmp.config(background="white")
+        imLabel = tkinter.Label(win, image=code_bmp).pack()
         label = tkinter.Label(win, text="BTE转账地址：")
         label.pack()
         T = tkinter.Text(win, height=1, width=60)
         T.pack()
         T.insert(tkinter.END, recv_address)
-        label = tkinter.Label(win, text="BTE转账金额（小数点后面的金额也一定要填，否则无法验证，并且会损失转账的币）：")
+        label = tkinter.Label(win, text="BTE转账金额（请勿修改转账金额,小数点后面的金额也一定要填，否则无法验证，并且会损失转账的币）：")
         label.pack()
         T = tkinter.Text(win, height=1, width=33)
         T.pack()
@@ -772,8 +884,8 @@ Iez4OV5lRRQhNxOFtdK5ff4DM3PfkBTfqrDfMqNiG5dJTRBo
 
     win = tkinter.Tk()
     win.title("币选小资金挖矿")
-    label = tkinter.Label(win,text="请在下面输入框输入您的API key:")
-    label.pack()
+    label1 = tkinter.Label(win,text="请在下面输入框输入您的API key:")
+    label1.pack()
     if has_record:
         show1 = tkinter.StringVar(value=load_access_key)
     else:
@@ -789,8 +901,8 @@ Iez4OV5lRRQhNxOFtdK5ff4DM3PfkBTfqrDfMqNiG5dJTRBo
     entry1.bind("<Button-3>", popupmenu1)
 
 
-    label = tkinter.Label(win, text="请在下面输入框输入您的API secret:")
-    label.pack()
+    label2 = tkinter.Label(win, text="请在下面输入框输入您的API secret:")
+    label2.pack()
 
     if has_record:
         show2 = tkinter.StringVar(value=load_access_secret)
@@ -806,45 +918,45 @@ Iez4OV5lRRQhNxOFtdK5ff4DM3PfkBTfqrDfMqNiG5dJTRBo
         menu2.post(event.x_root, event.y_root)
     entry2.bind("<Button-3>", popupmenu2)
 
-    label = tkinter.Label(win, text="使用前请把USDT放入交易账户，此软件会自动选择多个交易对挂单，并且只会使用总额最多100USDT,请不要放入过多的USDT在账户：")
-    #label.pack()
+    label4 = tkinter.Label(win, text="使用前请把USDT放入交易账户，此软件会自动选择多个交易对挂单，并且只会使用总额最多100USDT,请不要放入过多的USDT在账户：")
+    #label4.pack()
     entry4 = tkinter.Entry(win, width=50, bg="white", fg="black")
     if has_record:
         entry4.insert(tkinter.END,load_money)
    # entry4.pack()
 
-    label = tkinter.Label(win, text="请输入虚拟货币种类(可以输入多个货币，中间用1个空格隔开。如etc btc eos)：")
-   # label.pack()
+    label5 = tkinter.Label(win, text="请输入虚拟货币种类(可以输入多个货币，中间用1个空格隔开。如etc btc eos)：")
+   # label5.pack()
     entry5 = tkinter.Entry(win, width=50, bg="white", fg="black")
     if has_record:
         entry5.insert(tkinter.END,load_coin)
 
    # entry5.pack()
 
-    label = tkinter.Label(win, text="请输入挂单类型（1 或 2）1.只挂6-15档（矿损少，收益少一点）, 2.同时挂2-5档和6-15档（收益大，矿损大一点）：")
-    #label.pack()
+    label6 = tkinter.Label(win, text="请输入挂单类型（1 或 2）1.只挂6-15档（矿损少，收益少一点）, 2.同时挂2-5档和6-15档（收益大，矿损大一点）：")
+    #label6.pack()
     entry6 = tkinter.Entry(win, width=50, bg="white", fg="black")
     if has_record:
         entry6.insert(tkinter.END,load_parition)
 
     #entry6.pack()
 
-    label = tkinter.Label(win, text="请输入刷单金额(单位：usdt)：")
-    label.pack()
+    label7 = tkinter.Label(win, text="请输入刷单金额(单位：usdt)：")
+    label7.pack()
     entry7 = tkinter.Entry(win, width=50, bg="white", fg="black")
     if has_record:
         entry7.insert(tkinter.END,load_total_money)
     entry7.pack()
 
-    label = tkinter.Label(win, text="请选择挂单方向（1,2或3）1.只挂买单 2.只挂卖单 3.双向挂单")
-   # label.pack()
+    label8 = tkinter.Label(win, text="请选择挂单方向（1,2或3）1.只挂买单 2.只挂卖单 3.双向挂单")
+   # label8.pack()
     entry8 = tkinter.Entry(win, width=50, bg="white", fg="black")
     if has_record:
         entry8.insert(tkinter.END,load_bidirection)
  #   entry8.pack()
 
-    label = tkinter.Label(win, text="请输入交易区（1 或 2）1.主板,2.Fone：")
-   # label.pack()
+    label9 = tkinter.Label(win, text="请输入交易区（1 或 2）1.主板,2.Fone：")
+   # label9.pack()
     entry9 = tkinter.Entry(win, width=50, bg="white", fg="black")
     if has_record:
         entry9.insert(tkinter.END,load_coin_place)
@@ -854,20 +966,7 @@ Iez4OV5lRRQhNxOFtdK5ff4DM3PfkBTfqrDfMqNiG5dJTRBo
     button.pack()  # 加载到窗体，
     win.mainloop()
 
-    load_money = "usdt"
-    load_coin="eos etc ltc bch trx eth xrp ft xlm zec ada dash bsv iota btc"
-    load_parition="2"
-   # load_total_money="100"
-    load_bidirection="3"
-    load_coin_place="1"
-    while True:
-        p1=Process(target=tick,args=(load_access_key, load_access_secret, load_money, load_coin, load_parition, load_total_money, load_bidirection, load_coin_place,created_time,license_day,expired_time))
-        p1.daemon=True
-        p1.start()
-        p1.join(timeout=3600)
-        print("terminate")
-        p1.terminate()
-        print("main exit")
+
 
   #  period_restart()
 

@@ -1,6 +1,6 @@
 __author__ = 'Ziyang'
 
-import  struct
+#import  struct
 SERVER = 'api.fcoin.com'
 PORT = 80
 HT= 'https://%s/v2/'
@@ -22,9 +22,9 @@ KDATA = 'candles/%s/%s'
 KDATA_COLUMNS = ['id', 'open', 'high', 'low', 'close', 'count', 'base_vol', 'quote_vol', 'seq']
 KDATA_REAL_COL = ['datetime', 'open', 'high', 'low', 'close', 'count', 'base_vol', 'quote_vol', 'seq']
 
-import hmac
-import hashlib
-import pandas as pd
+from hmac import new
+from hashlib import sha1
+#import pandas as pd
 import requests
 import time
 import base64
@@ -106,7 +106,7 @@ class DataAPI():
         #print(sig_str)
         sig_str = bytes(sig_str,encoding = "utf8")
         sig_str = base64.b64encode(sig_str)
-        signature = base64.b64encode(hmac.new(self.secret, sig_str, digestmod=hashlib.sha1).digest())
+        signature = base64.b64encode(new(self.secret, sig_str, digestmod=sha1).digest())
         return signature
 
     def server_time(self):
@@ -118,12 +118,12 @@ class DataAPI():
     def symbols(self):
         js = self.public_request(GET, "https://www.ifukang.com/openapi/v2/symbols")['data']["symbols"]
         #print(js)
-        df = pd.DataFrame(js)
+       # df = pd.DataFrame(js)
         return js
 
     def get_ticker(self, symbol):
         return self.public_request(GET, self.http_market + TICKER % symbol)
-
+    '''
     def get_kdata(self, freq='M1', symbol=''):
         js = self.public_request(GET, self.http_market + KDATA % (freq, symbol))
         df = pd.DataFrame(js['data'])
@@ -131,7 +131,7 @@ class DataAPI():
         df = df[KDATA_COLUMNS]
         df.columns = KDATA_REAL_COL
         return df
-
+    '''
     def get_balance(self):
         """get user balance"""
         return self.signed_request(GET, self.http_account + 'balance')
