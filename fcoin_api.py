@@ -24,7 +24,6 @@ KDATA_REAL_COL = ['datetime', 'open', 'high', 'low', 'close', 'count', 'base_vol
 
 from hmac import new
 from hashlib import sha1
-#import pandas as pd
 import requests
 import time
 import base64
@@ -123,15 +122,9 @@ class DataAPI():
 
     def get_ticker(self, symbol):
         return self.public_request(GET, self.http_market + TICKER % symbol)
-    '''
-    def get_kdata(self, freq='M1', symbol=''):
-        js = self.public_request(GET, self.http_market + KDATA % (freq, symbol))
-        df = pd.DataFrame(js['data'])
-        df['id'] = df['id'].map(lambda x: int2time(x))
-        df = df[KDATA_COLUMNS]
-        df.columns = KDATA_REAL_COL
-        return df
-    '''
+    def get_kdata(self, freq='M1', symbol='',limit=1):
+        js = self.public_request(GET, self.http_market + KDATA % (freq, symbol),limit=limit)
+        return js
     def get_balance(self):
         """get user balance"""
         return self.signed_request(GET, self.http_account + 'balance')
@@ -514,3 +507,6 @@ class fcoin_api:
         # print("index:%d" % index)
         # print("coin_should_have:%f" % self.cell_money[index])
         return 5*(self.cell_step[index])
+    def get_kline(self,freq,market,limit=1):
+        return self._api.get_kdata(freq=freq,symbol=market,limit=limit)
+
