@@ -12,6 +12,7 @@ import multiprocessing
 from PIL import Image,ImageTk
 import random
 import socket
+import pyqrcode
 
 '''
 采用AES对称加密算法
@@ -701,18 +702,22 @@ Iez4OV5lRRQhNxOFtdK5ff4DM3PfkBTfqrDfMqNiG5dJTRBo
         entry1.bind("<Button-3>", popupmenu0)
         win.mainloop()
         '''
+
         recv_address = "0xae926369fd621702caea0d97a61a5d0b11290740"
+
         win = tkinter.Tk()
         win.title("付款")
-        im = Image.open("address.png").resize((100, 100))
-        img = ImageTk.PhotoImage(im)
-        imLabel = tkinter.Label(win, image=img).pack()
+        code = pyqrcode.create(recv_address)
+        code_xbm = code.xbm(scale=5)
+        code_bmp = tkinter.BitmapImage(data=code_xbm)
+        code_bmp.config(background="white")
+        imLabel = tkinter.Label(win, image=code_bmp).pack()
         label = tkinter.Label(win, text="BTE转账地址：")
         label.pack()
         T = tkinter.Text(win, height=1, width=60)
         T.pack()
         T.insert(tkinter.END, recv_address)
-        label = tkinter.Label(win, text="BTE转账金额（小数点后面的金额也一定要填，否则无法验证，并且会损失转账的币）：")
+        label = tkinter.Label(win, text="BTE转账金额（请勿修改转账金额,小数点后面的金额也一定要填，否则无法验证，并且会损失转账的币）：")
         label.pack()
         T = tkinter.Text(win, height=1, width=33)
         T.pack()
