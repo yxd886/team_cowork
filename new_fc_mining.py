@@ -304,7 +304,7 @@ def tick(load_access_key, load_access_secret, load_money, load_coin, load_pariti
         partition = int(load_parition.strip())
         assert (partition != 0)
         money_have = float(load_total_money.strip())
-        money_have = min(400, money_have)
+        #money_have = min(400, money_have)
 
         market_exchange_dict = {"bbgcusdt": "renren", "btmusdt": "jingxuanremenbi", "zipusdt": "servicex",
                                 "fiusdt": "fiofficial", "dogeusdt": "tudamu", "aeusdt": "servicex", "zrxusdt": "tudamu",
