@@ -137,6 +137,10 @@ def buy_main_body(mutex2, api, expire_time, created_time, license_day, bidirecti
             api.cancel_all_pending_order(market)
             counter = 0
             current_time = time.time()
+            if (current_time > expire_time):
+                print("license expired!!!")
+                a = input("")
+                sys.exit()
             obj = api.get_depth(market)
             buy1 = obj["bids"][0 * 2]
             ask1 = obj["asks"][0 * 2]
