@@ -155,8 +155,8 @@ def buy_main_body(mutex2, api, expire_time, created_time, license_day, bidirecti
             buy_price = buy1 - 8 * min_price_tick
             sell_price = ask1 + 8 * min_price_tick
             for i in range(8):
-                buy_price = buy_price + i * min_price_tick
-                sell_price = sell_price - i * min_price_tick
+                buy_price = buy_price +  min_price_tick
+                sell_price = sell_price -  min_price_tick
                 if need_buy:
                     api.take_order(market, "buy", buy_price, min_size, coin_place)
                     time.sleep(0.1)
@@ -727,12 +727,12 @@ Iez4OV5lRRQhNxOFtdK5ff4DM3PfkBTfqrDfMqNiG5dJTRBo
    # entry4.pack()
 
     label = tkinter.Label(win, text="请输入虚拟货币种类(可以输入多个货币，中间用1个空格隔开。如etc btc eos)：")
-   # label.pack()
+    label.pack()
     entry5 = tkinter.Entry(win, width=50, bg="white", fg="black")
     if has_record:
         entry5.insert(tkinter.END,load_coin)
 
-   # entry5.pack()
+    entry5.pack()
 
     label = tkinter.Label(win, text="请输入挂单类型（1 或 2）1.只挂6-15档（矿损少，收益少一点）, 2.同时挂2-5档和6-15档（收益大，矿损大一点）：")
     #label.pack()
@@ -768,7 +768,7 @@ Iez4OV5lRRQhNxOFtdK5ff4DM3PfkBTfqrDfMqNiG5dJTRBo
     win.mainloop()
 
     load_money = "usdt"
-    load_coin="eos etc ltc"
+    #load_coin="eos etc ltc"
     load_parition="2"
    # load_total_money="100"
     load_bidirection="3"
