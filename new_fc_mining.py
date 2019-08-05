@@ -391,32 +391,7 @@ def real_save_record():
     with open(config_file, 'w') as f:
         f.write(global_config)
 
-    # win.destroy()
-    for item in [label1, label2, label4, label5, label6, label7, label8, label9, entry1, entry2, entry4, entry5, entry6,
-                 entry7, entry8, entry9, button]:
-        item.destroy()
-
-    heart_counter = 1
-    run_label = tkinter.Label(win, text="软件运行状态：   运行中")
-    run_label.pack()
-    hert_label = tkinter.Label(win, text="------------------心跳窗口-----------------------")
-    hert_label.pack()
-    hert_label1 = tkinter.Label(win, text="心跳频率为每小时一次，若超过一个小时没有心跳，请退出重新开启该软件")
-    hert_label1.pack()
-    heart_T = tkinter.Text(win, height=30, width=60)
-    heart_T.pack()
-    start_time = time.time()
-    time.sleep(1)
-    current_time = time.time()
-    time_local = time.localtime(current_time)
-    dt = time.strftime("%Y-%m-%d %H:%M:%S", time_local)
-    heart_msg = "时间：" + dt + " 第%d次心跳.\n" % (heart_counter)
-    heart_T.insert(tkinter.END, heart_msg)
-
-    button2 = tkinter.Button(win, text="一键撤单并退出", command=cancel_exit)  # 收到消息执行这个函数
-    button2.pack()
-
-    win.update()
+    win.destroy()
 
     load_money = "usdt"
     #load_coin = "eth btc etc ltc eos bch trx xrp ft xlm zec ada dash bsv iota"
@@ -436,21 +411,11 @@ def real_save_record():
         print("terminate")
         global_process.terminate()
         print("main exit")
-        if (heart_counter % 10 == 0):
-            heart_T.delete('1.0', 'end')
-        heart_counter += 1
-        current_time = time.time()
-        time_local = time.localtime(current_time)
-        dt = time.strftime("%Y-%m-%d %H:%M:%S", time_local)
-        heart_msg = "时间：" + dt + " 第%d次心跳.\n" % (heart_counter)
-        heart_T.insert(tkinter.END, heart_msg)
-        win.update()
+
 
 
 def save_record():
-    thread = threading.Thread(target=real_save_record, args=())
-    thread.setDaemon(True)
-    thread.start()
+    real_save_record()
 
 
 def delete_record():
