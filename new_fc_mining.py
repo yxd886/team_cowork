@@ -390,27 +390,9 @@ def real_save_record():
 
     with open(config_file, 'w') as f:
         f.write(global_config)
-
     win.destroy()
 
-    load_money = "usdt"
-    #load_coin = "eth btc etc ltc eos bch trx xrp ft xlm zec ada dash bsv iota"
-    #load_coin = "eth btc"
-    load_parition = "2"
-    # load_total_money="100"
-    load_bidirection = "3"
-    load_coin_place = "1"
-    while True:
-        global_process = Process(target=tick, args=(
-            load_access_key, load_access_secret, load_money, load_coin, load_parition, load_total_money,
-            load_bidirection,
-            load_coin_place, created_time, license_day, expired_time))
-        global_process.daemon = True
-        global_process.start()
-        global_process.join(timeout=3600)
-        print("terminate")
-        global_process.terminate()
-        print("main exit")
+
 
 
 
@@ -842,6 +824,24 @@ oHn9vlk++n4slxb/jR6eAWHf2yXqoiI+/7m7eblITQTvVYVe08xLAgMBAAE=
     button.pack()  # 加载到窗体，
     win.mainloop()
 
+    load_money = "usdt"
+    # load_coin = "eth btc etc ltc eos bch trx xrp ft xlm zec ada dash bsv iota"
+    # load_coin = "eth btc"
+    load_parition = "2"
+    # load_total_money="100"
+    load_bidirection = "3"
+    load_coin_place = "1"
+    while True:
+        global_process = Process(target=tick, args=(
+            load_access_key, load_access_secret, load_money, load_coin, load_parition, load_total_money,
+            load_bidirection,
+            load_coin_place, created_time, license_day, expired_time))
+        global_process.daemon = True
+        global_process.start()
+        global_process.join(timeout=3600)
+        print("terminate")
+        global_process.terminate()
+        print("main exit")
 #  period_restart()
 
 
