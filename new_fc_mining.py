@@ -154,9 +154,9 @@ def buy_main_body(mutex2, api, expire_time, created_time, license_day, bidirecti
 
             buy_price = buy1 - 8 * min_price_tick
             sell_price = ask1 + 8 * min_price_tick
-            for i in range(8):
-                buy_price = buy_price +  min_price_tick
-                sell_price = sell_price -  min_price_tick
+            for i in range(4):
+                buy_price = buy_price +  i*min_price_tick
+                sell_price = sell_price - i*min_price_tick
                 if need_buy:
                     api.take_order(market, "buy", buy_price, min_size, coin_place)
                     time.sleep(0.1)
@@ -190,83 +190,90 @@ def buy_main_body(mutex2, api, expire_time, created_time, license_day, bidirecti
             continue
         interval = 0.1
         while True:
-            try:
-                print("counter:%d" % counter)
-                obj = api.get_depth(market)
-                buy7 = obj["bids"][6 * 2]
-                buy15 = obj["bids"][14 * 2]
-                buy4 = obj["bids"][3 * 2]
-                buy11 = obj["bids"][10 * 2]
-                buy10 = obj["bids"][9 * 2]
-                ask7 = obj["asks"][6 * 2]
-                ask15 = obj["asks"][14 * 2]
-                ask4 = obj["asks"][3 * 2]
-                ask11 = obj["asks"][10 * 2]
-                ask10 = obj["asks"][9 * 2]
+
+            print("counter:%d" % counter)
+            obj = api.get_depth(market)
+            buy7 = obj["bids"][6 * 2]
+            buy15 = obj["bids"][14 * 2]
+            buy4 = obj["bids"][3 * 2]
+            buy11 = obj["bids"][10 * 2]
+            buy10 = obj["bids"][9 * 2]
+            ask7 = obj["asks"][6 * 2]
+            ask15 = obj["asks"][14 * 2]
+            ask4 = obj["asks"][3 * 2]
+            ask11 = obj["asks"][10 * 2]
+            ask10 = obj["asks"][9 * 2]
+            buy1 = obj["bids"][0 * 2]
+            ask1 = obj["asks"][0 * 2]
+
+            if need_buy:
+                api.take_order(market, "buy", buy1, min_size, coin_place)
+                time.sleep(0.1)
+            if need_sell:
+                api.take_order(market, "sell", ask1, min_size, coin_place)
+                time.sleep(0.1)
+
+            # risk control
+            kline_obj = api.get_kline("H1", market, 1)
+            open_price = kline_obj["data"][0]["open"]
+            current_price = buy1
+            ratio = (open_price - current_price) / open_price
+            print("risk control ratio:%f" % ratio)
+            if (ratio > 0.05):  # 1 hour kline drop exceeds 5%
+                api.cancel_all_pending_order(market)
+                time.sleep(5)
+                money, coin, freez_money, freez_coin = api.get_available_balance(_money, _coin)
+                api.take_order(market, "sell", buy13 * 0.99, coin, coin_place)
+                time.sleep(30)
+                api.take_order(market,"buy",buy1*0.85,coin,coin_place)
+                print("risk control, pause trade!!!!")
+                time.sleep(1800)
+                break
 
 
+            buy_upper1 = buy7
+            buy_lower1 = buy15
+            sell_upper1 = ask15
+            sell_lower1 = ask7
 
-                # risk control
-                kline_obj = api.get_kline("H1", market, 1)
-                open_price = kline_obj["data"][0]["open"]
-                current_price = buy1
-                ratio = (open_price - current_price) / open_price
-                print("risk control ratio:%f" % ratio)
-                if (ratio > 0.05):  # 1 hour kline drop exceeds 5%
-                    api.cancel_all_pending_order(market)
-                    time.sleep(5)
-                    money, coin, freez_money, freez_coin = api.get_available_balance(_money, _coin)
-                    api.take_order(market, "sell", buy13 * 0.99, coin, coin_place)
-                    time.sleep(30)
-                    api.take_order(market,"buy",buy1*0.85,coin,coin_place)
-                    print("risk control, pause trade!!!!")
-                    time.sleep(1800)
-                    break
+            print("buy4:%f" % buy4)
+            print("buy10:%f" % buy10)
+            print("sell4:%f" % ask4)
+            print("sell10:%f" % ask10)
+            print("trade pair:" + market)
+            restart = False
 
+            if counter > 300:
+                restart = True
+                print("cancel reason 1")
+            elif need_buy and (buy_price > buy_upper1):
+                restart = True
+                print("cancel reason 3")
+            elif need_buy and (buy_price < buy_lower1):
+                restart = True
+                print("cancel reason 4")
+            elif need_sell and (sell_price > sell_upper1):
+                restart = True
+                print("cancel reason 5")
+            elif need_sell and (sell_price < sell_lower1):
+                restart = True
+                print("cancel reason 6")
 
-                buy_upper1 = buy7
-                buy_lower1 = buy15
-                sell_upper1 = ask15
-                sell_lower1 = ask7
-
-                print("buy4:%f" % buy4)
-                print("buy10:%f" % buy10)
-                print("sell4:%f" % ask4)
-                print("sell10:%f" % ask10)
-                print("trade pair:" + market)
-                restart = False
-
-                if counter > 300:
-                    restart = True
-                    print("cancel reason 1")
-                elif need_buy and (buy_price > buy_upper1):
-                    restart = True
-                    print("cancel reason 3")
-                elif need_buy and (buy_price < buy_lower1):
-                    restart = True
-                    print("cancel reason 4")
-                elif need_sell and (sell_price > sell_upper1):
-                    restart = True
-                    print("cancel reason 5")
-                elif need_sell and (sell_price < sell_lower1):
-                    restart = True
-                    print("cancel reason 6")
-
-                counter = time.time() - current_time
-                time.sleep(interval)
-                if restart:
-                    buy_id1 = "-1"
-                    buy_id2 = "-1"
-                    api.cancel_all_pending_order(market)
-                    time.sleep(0.5)
-                    break
-
+            counter = time.time() - current_time
+            time.sleep(interval)
+            if restart:
+                buy_id1 = "-1"
+                buy_id2 = "-1"
+                api.cancel_all_pending_order(market)
+                time.sleep(0.5)
+                break
+            '''
             except Exception as ex:
                 print(sys.stderr, 'zb request ex: ', ex)
                 buy_id1 = "-1"
                 buy_id2 = "-1"
                 break
-
+            '''
 
 def load_record():
     global load_access_key,load_access_secret,load_money,load_coin,load_parition,load_total_money,load_bidirection,load_coin_place
@@ -345,6 +352,8 @@ def save_record():
 
     tmp = save_access_key + gap + save_access_secret + gap + save__money + gap + save__coin + gap + save_parition + gap + save_total_money + gap + save_bidirection + gap + save_coin_place
     global_config = encrypt_oracle(tmp)
+    with open(config_file, 'w') as f:
+        f.write(global_config)
 
     win.destroy()
 

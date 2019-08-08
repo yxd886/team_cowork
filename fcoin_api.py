@@ -8,6 +8,7 @@ HTMRK = 'https://%s/v2/market/'
 HTPBL = 'https://%s/v2/public/'
 HTORD = 'https://%s/v2/orders/'
 HTACT = 'https://%s/v2/accounts/'
+HASSET='https://%s/v2/assets/accounts/assets-to-spot/'
 WS = 'wss://%S/v2/ws/'
 
 ST = 'server-time'
@@ -38,6 +39,7 @@ class DataAPI():
         self.http_market = HTMRK % SERVER
         self.http_orders = HTORD % SERVER
         self.http_account = HTACT % SERVER
+        self.http_asset_to_account = HASSET%SERVER
         self.key = key
         self.secret = bytes(secret,encoding = "utf8")
     def authorize(self, key='', secret=''):
@@ -124,13 +126,14 @@ class DataAPI():
     def get_ticker(self, symbol):
         return self.public_request(GET, self.http_market + TICKER % symbol)
 
-    def get_kdata(self, freq='M1', symbol=''):
-        js = self.public_request(GET, self.http_market + KDATA % (freq, symbol))
-        df = pd.DataFrame(js['data'])
-        df['id'] = df['id'].map(lambda x: int2time(x))
-        df = df[KDATA_COLUMNS]
-        df.columns = KDATA_REAL_COL
-        return df
+    def get_kdata(self, freq='M1', symbol='',limit=1):
+        js = self.public_request(GET, self.http_market + KDATA % (freq, symbol),limit=limit)
+        return js
+       # df = pd.DataFrame(js['data'])
+       # df['id'] = df['id'].map(lambda x: int2time(x))
+       # df = df[KDATA_COLUMNS]
+       # df.columns = KDATA_REAL_COL
+       # return df
 
     def get_balance(self):
         """get user balance"""
@@ -139,6 +142,8 @@ class DataAPI():
     def list_orders(self, **payload):
         """get orders"""
         return self.signed_request(GET, self.http_orders, **payload)
+    def wallet_to_trade(self,**payload):
+        return self.signed_request(POST, self.http_asset_to_account, **payload)
 
     def create_order(self, **payload):
         """create order"""
@@ -248,6 +253,8 @@ class fcoin_api:
 
         id = obj.get("data", "-1")
         return id
+    def wallet_to_trade(self,coin,amount):
+        self._api.wallet_to_trade(amount=amount,currency=coin)
 
     def get_order_info(self, market, id):
         obj = self._api.get_order(order_id=id)
@@ -514,5 +521,7 @@ class fcoin_api:
         # print("index:%d" % index)
         # print("coin_should_have:%f" % self.cell_money[index])
         return 5*(self.cell_step[index])
+
     def get_kline(self,freq,market,limit=1):
         return self._api.get_kdata(freq=freq,symbol=market,limit=limit)
+
