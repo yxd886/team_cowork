@@ -507,4 +507,3 @@ class fcoin_api:
         # print("index:%d" % index)
         # print("coin_should_have:%f" % self.cell_money[index])
         return 5*(self.cell_step[index])
- 

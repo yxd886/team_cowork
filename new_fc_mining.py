@@ -138,7 +138,7 @@ def buy_main_body(mutex2, api, expire_time, created_time, license_day, bidirecti
             api.cancel_all_pending_order(market)
             counter = 0
             current_time = time.time()
-            if (time_now > expire_time):
+            if (current_time > expire_time):
                 print("license expired!!!")
                 a = input("")
                 sys.exit()
