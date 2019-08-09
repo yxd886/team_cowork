@@ -507,6 +507,4 @@ class fcoin_api:
         # print("index:%d" % index)
         # print("coin_should_have:%f" % self.cell_money[index])
         return 5*(self.cell_step[index])
-    def get_kline(self,freq,market,limit=1):
-        return self._api.get_kdata(freq=freq,symbol=market,limit=limit)
-
+ 
