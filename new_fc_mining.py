@@ -131,6 +131,7 @@ def buy_main_body(mutex2, api, expire_time, created_time, license_day, bidirecti
     while True:
         try:
             #api.wallet_to_trade("usdt", 5)
+            step_size = 2*min_size
             api.cancel_all_pending_order(market)
             counter = 0
             current_time = time.time()
@@ -146,10 +147,10 @@ def buy_main_body(mutex2, api, expire_time, created_time, license_day, bidirecti
             # if need_sell:
             #    api.take_order(market, "sell", ask1, min_size, coin_place)
             if need_buy:
-                api.take_order(market, "buy", buy1, min_size, coin_place)
+                api.take_order(market, "buy", buy1, step_size, coin_place)
                 time.sleep(0.1)
             if need_sell:
-                api.take_order(market, "sell", ask1, min_size, coin_place)
+                api.take_order(market, "sell", ask1, step_size, coin_place)
                 time.sleep(0.1)
 
             buy_price = buy1 - 8 * min_price_tick
@@ -158,10 +159,10 @@ def buy_main_body(mutex2, api, expire_time, created_time, license_day, bidirecti
                 buy_price = buy_price + i * min_price_tick
                 sell_price = sell_price - i * min_price_tick
                 if need_buy:
-                    api.take_order(market, "buy", buy_price, min_size, coin_place)
+                    api.take_order(market, "buy", buy_price, step_size, coin_place)
                     time.sleep(0.1)
                 if need_sell:
-                    api.take_order(market, "sell", sell_price, min_size, coin_place)
+                    api.take_order(market, "sell", sell_price, step_size, coin_place)
                     time.sleep(0.1)
             buy_price = buy1 - 9 * min_price_tick
             sell_price = ask1 + 9 * min_price_tick
@@ -727,12 +728,12 @@ Iez4OV5lRRQhNxOFtdK5ff4DM3PfkBTfqrDfMqNiG5dJTRBo
    # entry4.pack()
 
     label = tkinter.Label(win, text="请输入虚拟货币种类(可以输入多个货币，中间用1个空格隔开。如etc btc eos)：")
-   # label.pack()
+    label.pack()
     entry5 = tkinter.Entry(win, width=50, bg="white", fg="black")
     if has_record:
         entry5.insert(tkinter.END,load_coin)
 
-   # entry5.pack()
+    entry5.pack()
 
     label = tkinter.Label(win, text="请输入挂单类型（1 或 2）1.只挂6-15档（矿损少，收益少一点）, 2.同时挂2-5档和6-15档（收益大，矿损大一点）：")
     #label.pack()
@@ -742,7 +743,7 @@ Iez4OV5lRRQhNxOFtdK5ff4DM3PfkBTfqrDfMqNiG5dJTRBo
 
     #entry6.pack()
 
-    label = tkinter.Label(win, text="请输入刷单金额(单位：usdt)：")
+    label = tkinter.Label(win, text="请输入刷单金额(单位：usdt,上限400)：")
     label.pack()
     entry7 = tkinter.Entry(win, width=50, bg="white", fg="black")
     if has_record:
