@@ -155,13 +155,6 @@ class TestThread(threading.Thread):
                 sell_lower1 = ask2
                 for tup in local_buy_list:
                     price = tup[1]
-                    if price >= buy_upper1:
-                        id = tup[0]
-                        self.api.cancel_order(self.market, id)
-                        self.mutex2.acquire()
-                        self.buy_list.remove(tup)
-                        self.mutex2.release()
-                        continue
                     if price <= buy_lower1:
                         id = tup[0]
                         self.api.cancel_order(self.market, id)
@@ -171,13 +164,6 @@ class TestThread(threading.Thread):
 
                 for tup in local_sell_list:
                     price = tup[1]
-                    if price <= sell_lower1:
-                        id = tup[0]
-                        self.api.cancel_order(self.market, id)
-                        self.mutex2.acquire()
-                        self.sell_list.remove(tup)
-                        self.mutex2.release()
-                        continue
                     if price >= sell_upper1:
                         id = tup[0]
                         self.api.cancel_order(self.market, id)
@@ -230,24 +216,22 @@ def buy_main_body(mutex2, api, expire_time, created_time, license_day, bidirecti
             buy1 = obj["bids"][0 * 2]
             ask1 = obj["asks"][0 * 2]
             money, coin, freez_money, freez_coin = api.get_available_balance(_money, _coin)
-            buy_amount = int(money/buy1//min_size)
-            buy_price = buy1 - (buy_amount-1) * min_price_tick
-            for i in range(buy_amount):
-                buy_price = buy_price + i * min_price_tick
-                id=api.take_order(market, "buy", buy_price,
-                               (min_size),
-                               coin_place)
-                if id!="-1":
-                    buy_list.append((id,buy_price))
-            sell_amount = int(coin//min_size)
-            sell_price = ask1 - (sell_amount - 1) * min_price_tick
-            for i in range(sell_amount):
-                sell_price = sell_price - i * min_price_tick
-                id=api.take_order(market, "sell", sell_price,
-                               (min_size),
-                               coin_place)
-                if id != "-1":
-                    sell_list.append((id,sell_price))
+
+            buy_price = buy1
+
+            id=api.take_order(market, "buy", buy_price,
+                           (min_size),
+                           coin_place)
+            if id!="-1":
+                buy_list.append((id,buy_price))
+
+            sell_price = ask1
+
+            id=api.take_order(market, "sell", sell_price,
+                           (min_size),
+                           coin_place)
+            if id != "-1":
+                sell_list.append((id,sell_price))
             thread.update(buy_list,sell_list)
             buy_list = list()
             sell_list=list()
