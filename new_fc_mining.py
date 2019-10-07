@@ -13,6 +13,7 @@ from PIL import Image,ImageTk
 import random
 import socket
 import pyqrcode
+import copy
 
 '''
 采用AES对称加密算法
@@ -115,86 +116,22 @@ def check_and_save(signature):
         #f.write(signature.decode())
     win.destroy()
 
+class TestThread(threading.Thread):
 
-def buy_main_body(mutex2, api, expire_time, created_time, license_day, bidirection, partition, _money, _coin, min_size,
-                  money_have, coin_place):
-    market = _coin + _money
-    buy_id1 = "-1"
-    buy_id2 = "-1"
-    need_buy = False
-    need_sell = False
-    min_price_tick = 1 / (10 ** api.price_decimal[market])
-    if bidirection == 1 or bidirection == 3:
-        need_buy = True
-    if bidirection == 2 or bidirection == 3:
-        need_sell = True
-    while True:
-        try:
-            #api.wallet_to_trade("usdt", 5)
-            step_size = 2*min_size
-            api.cancel_all_pending_order(market)
-            counter = 0
-            current_time = time.time()
-            if (current_time > expire_time):
-                print("license expired!!!")
-                a = input("")
-                sys.exit()
-            obj = api.get_depth(market)
-            buy1 = obj["bids"][0 * 2]
-            ask1 = obj["asks"][0 * 2]
-            # if need_buy:
-            #   api.take_order(market, "buy", buy1,min_size,coin_place)
-            # if need_sell:
-            #    api.take_order(market, "sell", ask1, min_size, coin_place)
-            if need_buy:
-                api.take_order(market, "buy", buy1, step_size, coin_place)
-                time.sleep(0.1)
-            if need_sell:
-                api.take_order(market, "sell", ask1, step_size, coin_place)
-                time.sleep(0.1)
+    def __init__(self,mutex2, api,market,name=None):
+        threading.Thread.__init__(self,name=name)
+        self.mutex2 = mutex2
+        self.api = api
+        self.market = market
+        self.sell_list=list()
+        self.buy_list = list()
 
-            buy_price = buy1 - 8 * min_price_tick
-            sell_price = ask1 + 8 * min_price_tick
-            for i in range(4):
-                buy_price = buy_price +  i*min_price_tick
-                sell_price = sell_price - i*min_price_tick
-                if need_buy:
-                    api.take_order(market, "buy", buy_price, step_size, coin_place)
-                    time.sleep(0.1)
-                if need_sell:
-                    api.take_order(market, "sell", sell_price, step_size, coin_place)
-                    time.sleep(0.1)
-            buy_price = buy1 - 9 * min_price_tick
-            sell_price = ask1 + 9 * min_price_tick
-            money, coin, freez_money, freez_coin = api.get_available_balance(_money, _coin)
-
-            if need_buy:
-                current_money_have = money_have - coin * buy1
-                available_coin_space = current_money_have / buy_price
-                money1 = min(money_have, money)
-                coin1_can_buy = money1 / buy_price
-                print("level 1 coin can buy:%f" % coin1_can_buy)
-                print("available_coin1_space:%f" % available_coin_space)
-                if available_coin_space > min_size and coin1_can_buy > min_size:
-                    print("take buy order 1")
-                    buy_id1 = api.take_order(market, "buy", buy_price,
-                                             (min(available_coin_space, coin1_can_buy)),
-                                             coin_place)
-            if need_sell:
-                coin1_can_sell = coin
-                if coin1_can_sell > min_size:
-                    sell_id_1 = api.take_order(market, "sell", sell_price, coin1_can_sell, coin_place)
-
-            # api.balance_account("QC","USDT")
-        except Exception as ex:
-            print(sys.stderr, 'zb request ex: ', ex)
-            continue
-        '''
-        interval = 0.1
+    def run(self):
         while True:
             try:
-                print("counter:%d" % counter)
-                obj = api.get_depth(market)
+                obj = self.api.get_depth(self.market)
+                buy2 = obj["bids"][1 * 2]
+                ask2 = obj["asks"][1 * 2]
                 buy7 = obj["bids"][6 * 2]
                 buy15 = obj["bids"][14 * 2]
                 buy4 = obj["bids"][3 * 2]
@@ -205,77 +142,102 @@ def buy_main_body(mutex2, api, expire_time, created_time, license_day, bidirecti
                 ask4 = obj["asks"][3 * 2]
                 ask11 = obj["asks"][10 * 2]
                 ask10 = obj["asks"][9 * 2]
-                buy1 = obj["bids"][0 * 2]
-                ask1 = obj["asks"][0 * 2]
+                self.mutex2.acquire()
+                local_buy_list = copy.deepcopy(self.buy_list)
+                local_sell_list = copy.deepcopy(self.sell_list)
+                self.mutex2.release()
+                #buy_upper1 = buy2
+                buy_lower1 = buy11
+                sell_upper1 = ask11
+                #sell_lower1 = ask2
+                for tup in local_buy_list:
+                    price = tup[1]
+                    if price <= buy_lower1:
+                        id = tup[0]
+                        self.api.cancel_order(self.market, id)
+                        self.mutex2.acquire()
+                        self.buy_list.remove(tup)
+                        self.mutex2.release()
 
-                if need_buy:
-                    api.take_order(market, "buy", buy1, min_size, coin_place)
-                    time.sleep(0.1)
-                if need_sell:
-                    api.take_order(market, "sell", ask1, min_size, coin_place)
-                    time.sleep(0.1)
-
-                # risk control
-                kline_obj = api.get_kline("H1", market, 1)
-                open_price = kline_obj["data"][0]["open"]
-                current_price = buy1
-                ratio = (open_price - current_price) / open_price
-                print("risk control ratio:%f" % ratio)
-                if (ratio > 0.05):  # 1 hour kline drop exceeds 5%
-                    api.cancel_all_pending_order(market)
-                    time.sleep(5)
-                    money, coin, freez_money, freez_coin = api.get_available_balance(_money, _coin)
-                    api.take_order(market, "sell", buy13 * 0.99, coin, coin_place)
-                    time.sleep(30)
-                    api.take_order(market,"buy",buy1*0.85,coin,coin_place)
-                    print("risk control, pause trade!!!!")
-                    time.sleep(1800)
-                    break
-
-
-                buy_upper1 = buy7
-                buy_lower1 = buy15
-                sell_upper1 = ask15
-                sell_lower1 = ask7
-
-                print("buy4:%f" % buy4)
-                print("buy10:%f" % buy10)
-                print("sell4:%f" % ask4)
-                print("sell10:%f" % ask10)
-                print("trade pair:" + market)
-                restart = False
-
-                if counter > 300:
-                    restart = True
-                    print("cancel reason 1")
-                elif need_buy and (buy_price > buy_upper1):
-                    restart = True
-                    print("cancel reason 3")
-                elif need_buy and (buy_price < buy_lower1):
-                    restart = True
-                    print("cancel reason 4")
-                elif need_sell and (sell_price > sell_upper1):
-                    restart = True
-                    print("cancel reason 5")
-                elif need_sell and (sell_price < sell_lower1):
-                    restart = True
-                    print("cancel reason 6")
-
-                counter = time.time() - current_time
-                time.sleep(interval)
-                if restart:
-                    buy_id1 = "-1"
-                    buy_id2 = "-1"
-                    api.cancel_all_pending_order(market)
-                    time.sleep(0.5)
-                    break
-
+                for tup in local_sell_list:
+                    price = tup[1]
+                    if price >= sell_upper1:
+                        id = tup[0]
+                        self.api.cancel_order(self.market, id)
+                        self.mutex2.acquire()
+                        self.sell_list.remove(tup)
+                        self.mutex2.release()
             except Exception as ex:
-                print(sys.stderr, 'zb request ex: ', ex)
-                buy_id1 = "-1"
-                buy_id2 = "-1"
-                break
-        '''
+                print(sys.stderr, 'monitor_thread: ', ex)
+                # a= input()
+    def update(self,buy_list,sell_list):
+        self.mutex2.acquire()
+        self.buy_list.extend(buy_list)
+        self.sell_list.extend(sell_list)
+        self.mutex2.release()
+
+
+def buy_main_body(mutex2, api, expire_time, created_time, license_day, bidirection, partition, _money, _coin, min_size,
+                  money_have, coin_place):
+    market = _coin + _money
+    buy_id1 = "-1"
+    buy_id2 = "-1"
+    need_buy = True
+    need_sell = True
+    min_price_tick = 1 / (10 ** api.price_decimal[market])
+    sell_list=list()
+    buy_list=list()
+    current_time = time.time()
+    if (current_time > expire_time):
+        print("license expired!!!")
+        a = input("")
+        sys.exit()
+    api.cancel_all_pending_order(market)
+    thread = TestThread(mutex2, api,market)
+    thread.setDaemon(True)
+    thread.start()
+    while True:
+
+        try:
+            current_time = time.time()
+            if (current_time > expire_time):
+                print("license expired!!!")
+                a = input("")
+                sys.exit()
+            # api.wallet_to_trade("usdt", 5)
+
+            #api.cancel_all_pending_order(market)
+            counter = 0
+
+            obj = api.get_depth(market)
+            buy1 = obj["bids"][0 * 2]
+            ask1 = obj["asks"][0 * 2]
+            money, coin, freez_money, freez_coin = api.get_available_balance(_money, _coin)
+            buy_amount = int(money/buy1//min_size)
+            buy_price = buy1 - (buy_amount-1) * min_price_tick
+            for i in range(buy_amount):
+                buy_price = buy_price + i * min_price_tick
+                id=api.take_order(market, "buy", buy_price,
+                               (min_size),
+                               coin_place)
+                if id!="-1":
+                    buy_list.append((id,buy_price))
+            sell_amount = int(coin//min_size)
+            sell_price = ask1 - (sell_amount - 1) * min_price_tick
+            for i in range(sell_amount):
+                sell_price = sell_price - i * min_price_tick
+                id=api.take_order(market, "sell", sell_price,
+                               (min_size),
+                               coin_place)
+                if id != "-1":
+                    sell_list.append((id,sell_price))
+            thread.update(buy_list,sell_list)
+            buy_list = list()
+            sell_list=list()
+        except Exception as ex:
+            print(sys.stderr, 'tick: ', ex)
+            # a= input()
+
 
 def load_record():
     global load_access_key,load_access_secret,load_money,load_coin,load_parition,load_total_money,load_bidirection,load_coin_place
@@ -730,7 +692,7 @@ Iez4OV5lRRQhNxOFtdK5ff4DM3PfkBTfqrDfMqNiG5dJTRBo
         menu2.post(event.x_root, event.y_root)
     entry2.bind("<Button-3>", popupmenu2)
 
-    label = tkinter.Label(win, text="使用前请把USDT放入交易账户，此软件会自动选择多个交易对挂单，并且只会使用总额最多100USDT,请不要放入过多的USDT在账户：")
+    label = tkinter.Label(win, text="使用前请把USDT放入交易账户，此软件会自动挂单eosusdt交易对(若要自定义交易对请联系币选团队购买VIP版本)：")
     #label.pack()
     entry4 = tkinter.Entry(win, width=50, bg="white", fg="black")
     if has_record:
@@ -738,12 +700,12 @@ Iez4OV5lRRQhNxOFtdK5ff4DM3PfkBTfqrDfMqNiG5dJTRBo
    # entry4.pack()
 
     label = tkinter.Label(win, text="请输入虚拟货币种类(可以输入多个货币，中间用1个空格隔开。如etc btc eos)：")
-    label.pack()
+    #label.pack()
     entry5 = tkinter.Entry(win, width=50, bg="white", fg="black")
     if has_record:
         entry5.insert(tkinter.END,load_coin)
 
-    entry5.pack()
+    #entry5.pack()
 
     label = tkinter.Label(win, text="请输入挂单类型（1 或 2）1.只挂6-15档（矿损少，收益少一点）, 2.同时挂2-5档和6-15档（收益大，矿损大一点）：")
     #label.pack()
@@ -779,7 +741,7 @@ Iez4OV5lRRQhNxOFtdK5ff4DM3PfkBTfqrDfMqNiG5dJTRBo
     win.mainloop()
 
     load_money = "usdt"
-    #load_coin="eos etc ltc"
+    load_coin="eos"
     load_parition="2"
    # load_total_money="100"
     load_bidirection="3"
